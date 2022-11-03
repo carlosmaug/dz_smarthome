@@ -16,7 +16,7 @@ class Configuration(object):
             self._json = optsDict
 
         opts = {}
-        opts['url'] = self.get(['url'], default='http://localhost:8080/')
+        opts['url'] = self.get(['url'], default='http://localhost/')
         opts['username'] = self.get(['username'], default='')
         opts['password'] = self.get(['password'], default='')
         opts['includeScenesGroups'] = self.get(['includeScenesGroups'], default=False)

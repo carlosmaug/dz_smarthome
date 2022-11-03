@@ -514,12 +514,21 @@ class Alexa(object):
                 'value': 'LOCKED'
             }]
             _LOGGER.debug("Request %s/%s", request[API_HEADER]['namespace'], request[API_HEADER]['name'])
+            endpoint = self.handler.getEndpoint(request)
+            endpoint.Lock()
             return api_message(request, context={'properties': properties})
 
         # Not supported by Alexa ...
         def Unlock(self, request):
+            properties = [{
+                'name': 'lockState',
+                'namespace': 'Alexa.LockController',
+                'value': 'UNLOCKED'
+            }]
             _LOGGER.debug("Request %s/%s", request[API_HEADER]['namespace'], request[API_HEADER]['name'])
-            return api_message(request)
+            endpoint = self.handler.getEndpoint(request)
+            endpoint.Unlock()
+            return api_message(request, context={'properties': properties})
 
     class InputController(AlexaSmartHomeCall):
 
