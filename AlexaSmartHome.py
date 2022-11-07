@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Tuple
 
 import math, colorsys
-import traceback 
+import traceback
 from typing import Callable, TypeVar
 
 CALLABLE_T = TypeVar('CALLABLE_T', bound=Callable)  # noqa pylint: disable=invalid-name
@@ -214,6 +214,9 @@ class AlexaInputController(AlexaInterface):
     def name(self):
         return 'Alexa.InputController'
 
+    def propertiesSupported(self):
+        return [{'name': 'inputs'}]
+
 @INTERFACES.register('Alexa.TemperatureSensor')
 class AlexaTemperatureSensor(AlexaInterface):
     def name(self):
@@ -394,7 +397,7 @@ class Alexa(object):
 
         def SetBrightness(self, request):
             brightness = int(request[API_PAYLOAD]['brightness'])
-            _LOGGER.debug("Request %s/%s brightness %d", 
+            _LOGGER.debug("Request %s/%s brightness %d",
                    request[API_HEADER]['namespace'], request[API_HEADER]['name'],
                    brightness)
             endpoint = self.handler.getEndpoint(request)
@@ -402,7 +405,7 @@ class Alexa(object):
 
         def AdjustBrightness(self, request):
             brightness_delta = int(request[API_PAYLOAD]['brightnessDelta'])
-            _LOGGER.debug("Request %s/%s brightness_delta %d", 
+            _LOGGER.debug("Request %s/%s brightness_delta %d",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'],
                         brightness_delta)
             endpoint = self.handler.getEndpoint(request)
@@ -415,7 +418,7 @@ class Alexa(object):
             h = float(request[API_PAYLOAD]['color']['hue'])
             s = float(request[API_PAYLOAD]['color']['saturation'])
             b = float(request[API_PAYLOAD]['color']['brightness'])
-            _LOGGER.debug("Request %s/%s", 
+            _LOGGER.debug("Request %s/%s",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'])
             endpoint = self.handler.getEndpoint(request)
             endpoint.setColor(h,s,b)
@@ -425,7 +428,7 @@ class Alexa(object):
 
         def SetColorTemperature(self, request):
             kelvin = int(request[API_PAYLOAD]['colorTemperatureInKelvin'])
-            _LOGGER.debug("Request %s/%s kelvin %d", 
+            _LOGGER.debug("Request %s/%s kelvin %d",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'],
                         kelvin)
             endpoint = self.handler.getEndpoint(request)
@@ -482,7 +485,7 @@ class Alexa(object):
             ##    if percentage <= 33:
             ##        speed = "low"
             ## ...
-            _LOGGER.debug("Request %s/%s percentage %d", 
+            _LOGGER.debug("Request %s/%s percentage %d",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'],
                         percentage)
             endpoint = self.handler.getEndpoint(request)
@@ -493,7 +496,7 @@ class Alexa(object):
 
         def AdjustPercentage(self, request):
             percentage_delta = int(request[API_PAYLOAD]['percentageDelta'])
-            _LOGGER.debug("Request %s/%s percentage_delta %d", 
+            _LOGGER.debug("Request %s/%s percentage_delta %d",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'],
                         percentage_delta)
             endpoint = self.handler.getEndpoint(request)
@@ -534,7 +537,9 @@ class Alexa(object):
 
         def SelectInput(self, request):
             media_input = request[API_PAYLOAD]['input']
-            _LOGGER.debug("Request %s/%s media_input %s", request[API_HEADER]['namespace'], request[API_HEADER]['name',media_input])
+            _LOGGER.debug("Request %s/%s media_input %s", request[API_HEADER]['namespace'], request[API_HEADER]['name', media_input])
+            endpoint = self.handler.getEndpoint(request)
+            endpoint.setInput(media_input)
             return api_message(request)
 
     class Speaker(AlexaSmartHomeCall):
@@ -613,7 +618,7 @@ class Alexa(object):
             ##unit = entity.attributes[CONF_UNIT_OF_MEASUREMENT]
             temp_delta = temperature_from_object(request[API_PAYLOAD]['targetSetpointDelta'])
 
-            _LOGGER.debug("Request %s/%s targetSetpoint temp_delta %.2f", 
+            _LOGGER.debug("Request %s/%s targetSetpoint temp_delta %.2f",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'], temp_delta)
 
             endpoint = self.handler.getEndpoint(request)
@@ -635,7 +640,7 @@ class Alexa(object):
             mode = request[API_PAYLOAD]['thermostatMode']
             mode = mode if isinstance(mode, str) else mode['value']
 
-            _LOGGER.debug("Request %s/%s targetSetpoint mode %s", 
+            _LOGGER.debug("Request %s/%s targetSetpoint mode %s",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'], str(mode))
 
             endpoint = self.handler.getEndpoint(request)
@@ -655,7 +660,7 @@ class Alexa(object):
             for interface in endpoint.capabilities():
                 properties.extend(interface.serializeProperties())
 
-            _LOGGER.debug("Request %s/%s properties %s", 
+            _LOGGER.debug("Request %s/%s properties %s",
                         request[API_HEADER]['namespace'], request[API_HEADER]['name'], str(properties))
             return api_message(request,
                 name='StateReport',
