@@ -15,9 +15,11 @@ _LOGGER = logging.getLogger(__name__)
 class DomoticzEndpoint(AlexaEndpoint):
 
     _device_ = None
+    
     def getDevice(self):
         if self._device_ is None:
             self._device_ = self.handler.getDevice(self._endpointId)
+            
         return self._device_
 
     def setHandler(self, handler):
@@ -26,6 +28,7 @@ class DomoticzEndpoint(AlexaEndpoint):
     def getProperty(self, name):
         #device = self.handler.getDevice(self._endpointId)
         device = self.getDevice()
+        
         if   name == 'powerState':
             if device['Status'] == 'On':
                 return 'ON'
@@ -36,6 +39,7 @@ class DomoticzEndpoint(AlexaEndpoint):
                 return 'LOCKED'
             else:
                 return 'UNLOCKED'
+                
             return 'JAMMED'
         elif name == 'brightness':
             level = device['Level']
@@ -135,10 +139,10 @@ class SwitchLightAlexaEndpoint(OnOffAlexaEndpoint):
 class BlindAlexaEndpoint(OnOffAlexaEndpoint):
 
     def turnOn(self):
-        self.handler.setSwitch(self._endpointId, 'Off')
+        self.handler.setSwitch(self._endpointId, 'On')
 
     def turnOff(self):
-        self.handler.setSwitch(self._endpointId, 'On')
+        self.handler.setSwitch(self._endpointId, 'Off')
 
     def setPercentage(self, percentage):
         self.handler.setLevel(self._endpointId, percentage)
@@ -260,21 +264,25 @@ class Domoticz(object):
         self.config = config
 
     def api(self, query):
-        url = self.url + "json.htm?" + query
-        print("Domoticz API call %s", url)
-        _LOGGER.debug("Domoticz API call %s", url)
+        url     = self.url + "json.htm?" + query
         headers = { 'Content-Type': 'application/json' }
+        
+        _LOGGER.debug("Domoticz API call %s", url)
+        
         if self.authorization is not None:
             headers['Authorization'] = self.authorization
+            
         payload = urlopen(Request(url, None, headers)).read()
+        
         return json.loads(payload.decode('utf-8'))
 
     def getEndpoint(self, request):
         endpointId = request['endpoint']['endpointId']
-        items = endpointId.split("-")
-        className = items[0]
-        id = items[1]
-        endpoint = ENDPOINT_ADAPTERS[className](id)
+        items      = endpointId.split("-")
+        className  = items[0]
+        id         = items[1]
+        endpoint   = ENDPOINT_ADAPTERS[className](id)
+        
         if className == 'SwitchLight':
             endpoint.addCapability(AlexaPercentageController(endpoint, 'Alexa.PercentageController',[{'name': 'percentage'}]))
             endpoint.addCapability(AlexaBrightnessController(endpoint, 'Alexa.BrightnessController',[{'name': 'brightness'}]))
@@ -282,10 +290,15 @@ class Domoticz(object):
             endpoint.addCapability(AlexaColorTemperatureController(endpoint, 'Alexa.ColorTemperatureController'))
         elif className == 'Blind' or className == 'RFY':
             endpoint.addCapability(AlexaPercentageController(endpoint, 'Alexa.PercentageController',[{'name': 'percentage'}]))
-        cookies = request['endpoint']['cookie']
-        if cookies is not None:
+        
+        try:
+            cookies = request['endpoint']['cookie']
             endpoint.addCookie(cookies)
+        except KeyError:
+            pass
+
         endpoint.setHandler(self)
+        
         return endpoint
 
     def getEndpoints(self):
@@ -294,12 +307,13 @@ class Domoticz(object):
         # Devices
         response = self.api('type=devices&used=true')
         devices  = response['result']
-        _LOGGER.debug("----->: %s", response)
 
         for device in devices:
+
             endpoint = None
 
             if (device['PlanID'] == "0" or device['PlanID'] == ""): continue
+    
             if (self.planID >= 0 and (not (self.planID in device['PlanIDs']))): continue
 
             devType      = device['Type']
@@ -325,19 +339,20 @@ class Domoticz(object):
 
             if matchObj:  extra = matchObj.group(1)
 
-            _LOGGER.debug("Device name: %s / type: %s / Switch type: %s / Extra: %s", friendlyName, devType, device['SwitchType'], extra)
-
             if self.prefixName is not None:
                 #friendlyName = self.prefixName + friendlyName
                 description = self.prefixName + description
 
             if (devType.startswith('Lighting') or devType.startswith('Color Switch')):
                 switchType = device['SwitchType']
+                _LOGGER.debug("Device name: %s / type: %s / Switch type: %s / Extra: %s", friendlyName, devType, switchType, extra)
+                
                 if switchType == 'On/Off':
                     # Usual switch case
                     endpoint = SwitchLightAlexaEndpoint("SwitchLight-"+endpointId, friendlyName, description, manufacturerName)
                     endpoint.addDisplayCategories("SWITCH")
                     hasDimmer = deviceHasDimmer(device)
+                    
                     if (hasDimmer):
                         endpoint.addCapability(AlexaPercentageController(self, 'Alexa.PercentageController',[{'name': 'percentage'}]))
                         endpoint.addCapability(AlexaBrightnessController(self, 'Alexa.BrightnessController',[{'name': 'brightness'}]))
@@ -346,17 +361,21 @@ class Domoticz(object):
                     endpoint = SwitchLightAlexaEndpoint("SwitchLight-"+endpointId, friendlyName, description, manufacturerName)
                     endpoint.addDisplayCategories("LIGHT")
                     hasDimmer = deviceHasDimmer(device)
+                    
                     if (hasDimmer):
                         endpoint.addCapability(AlexaPercentageController(self, 'Alexa.PercentageController',[{'name': 'percentage'}]))
                         endpoint.addCapability(AlexaBrightnessController(self, 'Alexa.BrightnessController',[{'name': 'brightness'}]))
+                    
                     subType = device['SubType']
+                    
                     if (subType.startswith("RGB")):
                         endpoint.addCapability(AlexaColorController(self, 'Alexa.ColorController'))
                         endpoint.addCapability(AlexaColorTemperatureController(self, 'Alexa.ColorTemperatureController'))
 
             elif (devType.startswith('Light/Switch')):
                 switchType = device['SwitchType']
-                # Special case to implement a "virtual thermostat"
+                _LOGGER.debug("Device name: %s / type: %s / Switch type: %s / Extra: %s", friendlyName, devType, switchType, extra)
+                
                 if switchType == 'Selector':
                     if extra is not None:
                         # https://developer.amazon.com/en-US/docs/alexa/device-apis/alexa-inputcontroller.html
@@ -365,6 +384,9 @@ class Domoticz(object):
                         if 'confort' in extra.lower():
                             endpoint = ThermostatAlexaEndpoint("SelectorThermostat-"+endpointId, friendlyName, description, manufacturerName)
                             endpoint.addDisplayCategories("THERMOSTAT")
+                        else:
+                            endpoint = MediaInputAlexaEndpoint("SelectorMedia-"+endpointId, friendlyName, description, manufacturerName)
+                            endpoint.addDisplayCategories("TV")
                     else:
                         endpoint = MediaInputAlexaEndpoint("SelectorMedia-"+endpointId, friendlyName, description, manufacturerName)
                         endpoint.addDisplayCategories("TV")
@@ -375,10 +397,14 @@ class Domoticz(object):
                     endpoint = ContactAlexaEndpoint("Contact-"+endpointId, friendlyName, description, manufacturerName)
                     endpoint.addDisplayCategories("CONTACT_SENSOR")
                 elif (switchType.startswith('Blind') or switchType.startswith('RFY')):
-                    if   switchType.startswith('Blind'): endpoint = BlindAlexaEndpoint("Blind-"+endpointId, friendlyName, description, manufacturerName)
-                    elif switchType.startswith('RFY'):   endpoint = RFYAlexaEndpoint("RFY-"+endpointId, friendlyName, description, manufacturerName)
+                    if switchType.startswith('Blind'): 
+                        endpoint = BlindAlexaEndpoint("Blind-"+endpointId, friendlyName, description, manufacturerName)
+                    elif switchType.startswith('RFY'):   
+                        endpoint = RFYAlexaEndpoint("RFY-"+endpointId, friendlyName, description, manufacturerName)
+                        
                     endpoint.addDisplayCategories("SWITCH")
                     hasDimmer = deviceHasDimmer(device)
+                    
                     if (hasDimmer):
                         endpoint.addCapability(AlexaPercentageController(self, 'Alexa.PercentageController',[{'name': 'percentage'}]))
                 else:
@@ -386,10 +412,13 @@ class Domoticz(object):
                     endpoint = SwitchLightAlexaEndpoint("SwitchLight-"+endpointId, friendlyName, description, manufacturerName)
                     endpoint.addDisplayCategories("SWITCH")
                     hasDimmer = deviceHasDimmer(device)
+                    
                     if (hasDimmer):
                         endpoint.addCapability(AlexaPercentageController(self, 'Alexa.PercentageController',[{'name': 'percentage'}]))
                         endpoint.addCapability(AlexaBrightnessController(self, 'Alexa.BrightnessController',[{'name': 'brightness'}]))
+                    
                     subType = device['SubType']
+                    
                     if (subType.startswith("RGB")):
                         endpoint.addDisplayCategories("LIGHT")
                         endpoint.addCapability(AlexaColorController(self, 'Alexa.ColorController'))
@@ -398,45 +427,47 @@ class Domoticz(object):
             elif (devType.startswith('Lock')):
                 endpoint = LockAlexaEndpoint("Lock-"+endpointId, friendlyName, description, manufacturerName)
                 endpoint.addDisplayCategories("SMARTLOCK")
-
             elif (devType.startswith('Contact')):
                 endpoint = ContactAlexaEndpoint("Contact-"+endpointId, friendlyName, description, manufacturerName)
                 endpoint.addDisplayCategories("CONTACT_SENSOR")
-
             elif (devType.startswith('Temp')):
                 endpoint = TemperatureSensorAlexaEndpoint("TemperatureSensor-"+endpointId, friendlyName, description, manufacturerName)
                 endpoint.addDisplayCategories("TEMPERATURE_SENSOR")
-
             elif (devType.startswith('Therm')):
                 endpoint = ThermostatAlexaEndpoint("Thermostat-"+endpointId, friendlyName, description, manufacturerName)
                 endpoint.addDisplayCategories("THERMOSTAT")
                 endpoint.addDisplayCategories("TEMPERATURE_SENSOR")
-
+                
             if (endpoint is not None):
                 if extra is not None:
                     endpoint.addCookie({ "extra": extra} )
-                #print(endpoint.displayCategories())
+    
                 endpoints.append(endpoint)
 
         # Scenes/Groups
         if self.includeScenesGroups:
             response = self.api('type=scenes')
             scenes= response['result']
+            
             for scene in scenes:
-                endpoint = None
-
-                sceneType = scene['Type']
-                friendlyName = scene['Name']
-                endpointId = scene['idx']
+                endpoint         = None
+                sceneType        = scene['Type']
+                friendlyName     = scene['Name']
+                endpointId       = scene['idx']
                 manufacturerName = SKILL_NAME
-                description = sceneType
+                description      = sceneType
 
                 matchObj = re.match( r'.*Alexa_Name:\s*([^\n]*)', scene['Description'], re.M|re.I|re.DOTALL)
+                
                 if matchObj:  friendlyName = matchObj.group(1)
+                
                 matchObj = re.match( r'.*Alexa_Description:\s*([^\n]*)', scene['Description'], re.M|re.I|re.DOTALL)
+                
                 if matchObj:  description = matchObj.group(1)
-                extra = None
+                
+                extra    = None
                 matchObj = re.match( r'.*Alexa_extra:\s*([^\n]*)', scene['Description'], re.M|re.I|re.DOTALL)
+                
                 if matchObj:  extra = matchObj.group(1)
 
                 if self.prefixName is not None:
@@ -453,6 +484,7 @@ class Domoticz(object):
                 if (endpoint is not None):
                     if extra is not None:
                         endpoint.addCookie({ "extra": extra} )
+                        
                     endpoints.append(endpoint)
 
         return endpoints

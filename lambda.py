@@ -51,3 +51,5 @@ def event_handler(request, context):
     logger.debug("Skill response %s", response)
 
     return response
+    
+# aws lambda update-function-configuration --function-name Alexicz --handler "lambda.event_handler"
